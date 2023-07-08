@@ -1,3 +1,9 @@
+/*
+ * @Author  :   XavierYorke 
+ * @Contact :   mzlxavier1230@gmail.com
+ * @Time    :   2023-07-08
+ */
+
 #include "sql.h"
 
 User_manager::User_manager() {
@@ -64,17 +70,3 @@ bool User_manager::do_command(char sql_command[]) {
     }
     return true;
 }
-
-/*
-int main() {
-    User_manager* m_manager = User_manager::GetInstance();
-    User user("Xavier", "key001");
-    // m_manager->m_insert(user);
-    vector<User> users = m_manager->m_query();
-    for (auto& user: users) {
-        cout  << "name: " << user.m_name << ", passwd: " << user.m_passwd << endl;
-    }
-
-    return 0;
-}
-*/

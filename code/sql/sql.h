@@ -1,3 +1,9 @@
+/*
+ * @Author  :   XavierYorke 
+ * @Contact :   mzlxavier1230@gmail.com
+ * @Time    :   2023-07-08
+ */
+
 #pragma once
 
 #include <mysql/mysql.h>
@@ -19,11 +25,6 @@ class User_manager {
 public:
     User_manager();
     ~User_manager();
-    // 单例模式
-    // static User_manager* GetInstance() {
-    //     static User_manager student_manager;
-    //     return &student_manager;
-    // }
 
     bool m_insert(User& stu);
     bool m_update(User& stu);
@@ -36,7 +37,7 @@ private:
     const char* host = "127.0.0.1";
     const char* user = "root";
     const char* passwd = "123456";
-    const char* database_name = "FreeChat";
-    const char* table_name = "Users";
+    const char* database_name = "FreelyChat";
+    const char* table_name = "User";
     const int port = 3306;
 };

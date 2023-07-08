@@ -1,3 +1,9 @@
+/*
+ * @Author  :   XavierYorke 
+ * @Contact :   mzlxavier1230@gmail.com
+ * @Time    :   2023-07-08
+ */
+
 #include "server.h"
 
 #include <assert.h>
@@ -28,9 +34,9 @@ Server::Server()
     
     SockInit();
 
-    string msg = string("ChatRoom Start Successfully!\n");
+    string msg = string("FreelyChat Start Successfully!\n");
     logger->Info(msg);
-    msg = "Join The ChatRoom By Connecting to " + ServerIP;
+    msg = "Join The FreelyChat By Connecting to " + ServerIP;
     logger->Info(msg);
     // fflush(stdout);
 }
@@ -67,7 +73,6 @@ void Server::HandleConnect() {
 }
 
 void Server::HandleStart(int fd) {
-    logger->Info(__func__);
     char state[STATE_LEN] = {0};
     while (true) {
         memset(state, 0, STATE_LEN);
@@ -85,14 +90,13 @@ void Server::HandleStart(int fd) {
         }
 
         else {
-            cout << "register\n";
-            // pool->addTask(bind(&Server::HandleRegister, this, &client));
+            pool->addTask(bind(&Server::HandleRegister, this, fd));
+            return;
         }
     }
 }
 
 void Server::HandleLogin(int fd) {
-    logger->Info(__func__);
     char buf[BufferLen] = {0};
     vector<User> user;
 
@@ -138,18 +142,15 @@ void Server::HandleLogin(int fd) {
             }
             else break;
         }
-        cout << "passwd: " << buf << endl;
         if (strcmp(buf, "Q") == 0 || strcmp(buf, "q") == 0) {
             pool->addTask(bind(&Server::HandleStart, this, fd));
             return;
         }
         else {
             if (user[0].m_passwd != buf) {
-                cout << "wrong passwd\n";
                 send(fd, N, strlen(N), 0);
             }
             else {
-                cout << "correct passwd\n";
                 send(fd, Y, strlen(Y), 0);
                 break;
             }
@@ -162,41 +163,89 @@ void Server::HandleLogin(int fd) {
     Clients[fd].isOnline = true;
 }
 
-void HandleRegister(Client* client) {
+void Server::HandleRegister(int fd) {
+    char buf[BufferLen] = {0};
+    vector<User> user;
 
+    // name
+    while (true) {
+        while (true) {
+            memset(buf, 0, BufferLen);
+            int len = recv(fd, buf, BufferLen, 0);
+            if (len < 0) continue;
+            else if (len == 0) {
+                pool->addTask(bind(&Server::CloseConn, this, fd));
+                return;
+            }
+            else break;
+        }
+        if (strcmp(buf, "Q") == 0 || strcmp(buf, "q") == 0) {
+            pool->addTask(bind(&Server::HandleStart, this, fd));
+            return;
+        }
+        else {
+            user = manager->m_query(string("where name = '") + buf + string("'"));
+            if (!user.empty()) {
+                send(fd, N, strlen(N), 0);
+            }
+            else {
+                send(fd, Y, strlen(Y), 0);
+                break;
+            }
+        }
+    }
+
+    Clients[fd].name = buf;
+
+    // password
+    while (true) {
+        while (true) {
+            memset(buf, 0, BufferLen);
+            int len = recv(fd, buf, BufferLen, 0);
+            if (len < 0) continue;
+            else if (len == 0) {
+                pool->addTask(bind(&Server::CloseConn, this, fd));
+                return;
+            }
+            else break;
+        }
+        if (strcmp(buf, "Q") == 0 || strcmp(buf, "q") == 0) {
+            pool->addTask(bind(&Server::HandleStart, this, fd));
+            return;
+        }
+        else {
+            User user(Clients[fd].name, buf);
+            manager->m_insert(user);
+            send(fd, Y, strlen(Y), 0);
+            break;
+        }
+    }
+
+    string msg = "Welcome " + Clients[fd].name + ". Online Num: " + to_string(CurUserCnt);
+    MsgQ.push(SockMsg(-1, msg));
+    pool->addTask(bind(&Server::HandleMsg, this, BROADCAST));
+    Clients[fd].isOnline = true;
 }
 
 void Server::HandleRecv(Client* client) {
-    cout << __func__ << endl;
     while (true) {
         if (!client->isOnline) continue;
-        if (client->name == "") {
-            // char tmp[1024] = {0};
-            // recv(client->sockfd, tmp, 1024, 0);
-            // client->name = tmp;
-
-            // string msg = "Welcome " + client->name + ". Online Num: " + to_string(CurUserCnt);
-            // MsgQ.push(SockMsg(-1, msg));
-            // pool->addTask(bind(&Server::HandleMsg, this, BROADCAST));
+        char buf[BufferLen] = {0};
+        int recv_len = recv(client->sockfd, buf, BufferLen, 0);
+        if (recv_len < 0) {
+            continue;
         }
-        else {
-            char buf[BufferLen] = {0};
-            int recv_len = recv(client->sockfd, buf, BufferLen, 0);
-            if (recv_len < 0) {
-                continue;
-            }
-            else if (recv_len == 0) {
-                pool->addTask(bind(&Server::CloseConn, this, client->sockfd));
-                return;
-            }
-
-            string msg(buf, recv_len);
-            msg = "[" + client->name + "]: " + msg;
-            strcpy(buf, msg.c_str());
-
-            MsgQ.push(SockMsg(client->sockfd, buf));
-            pool->addTask(bind(&Server::HandleMsg, this, BROADCAST));
+        else if (recv_len == 0) {
+            pool->addTask(bind(&Server::CloseConn, this, client->sockfd));
+            return;
         }
+
+        string msg(buf, recv_len);
+        msg = "[" + client->name + "]: " + msg;
+        strcpy(buf, msg.c_str());
+
+        MsgQ.push(SockMsg(client->sockfd, buf));
+        pool->addTask(bind(&Server::HandleMsg, this, BROADCAST));
     }
 }
 
@@ -231,10 +280,10 @@ void Server::Start() {
             uint32_t events = epoller->GetEvent(i);
 
             if (sockfd == lfd) {
-                cout << "sockfd == lfd\n";
                 pool->addTask(bind(&Server::HandleConnect, this));
             }
             else if(events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
+                if (!Clients[sockfd].isOnline) continue;
                 assert(Clients.count(sockfd) > 0);
                 pool->addTask(bind(&Server::CloseConn, this, sockfd));
             }
@@ -245,7 +294,6 @@ void Server::Start() {
 
             else if (events & EPOLLOUT) {
                 assert(Clients.count(sockfd) > 0);
-                // HandleMsg((void*)&Clients[sockfd]);
             }
         }
     }
@@ -279,15 +327,14 @@ void Server::SockInit() {
 }
 
 void Server::CloseConn(int fd) {
-    if (Clients[fd].name == "") Clients[fd].name = "NameUnknown";
-    string msg = Clients[fd].name + " Left ChatRoom. Online Num: " + to_string(--CurUserCnt);
+    if (!Clients[fd].isOnline) Clients[fd].name = "NameUnknown";
+    string msg = Clients[fd].name + " Left. Online Num: " + to_string(--CurUserCnt);
 
     Clients.erase(fd);
     epoller->DelFd(fd);
     
     MsgQ.push(SockMsg(-1, msg));
     pool->addTask(bind(&Server::HandleMsg, this, BROADCAST));
-
 }
 
 int Server::SetNonBlocking(int fd) {

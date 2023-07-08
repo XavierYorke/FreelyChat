@@ -1,3 +1,9 @@
+/*
+ * @Author  :   XavierYorke 
+ * @Contact :   mzlxavier1230@gmail.com
+ * @Time    :   2023-07-08
+ */
+
 #include "epoller.h"
 
 Epoller::Epoller(int maxEvent): epollfd(epoll_create(1)), events(maxEvent) {
