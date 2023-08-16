@@ -1,5 +1,5 @@
 base/
-log/
+logs/
 test.cpp
 bin/
 .vscode/

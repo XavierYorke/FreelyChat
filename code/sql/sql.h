@@ -35,6 +35,7 @@ public:
 private:
     MYSQL* conn;
     const char* host = "127.0.0.1";
+
     const char* user = "root";
     const char* passwd = "123456";
     const char* database_name = "FreelyChat";
