@@ -29,7 +29,7 @@ Server::Server()
       ConnEvent(EPOLLRDHUP | EPOLLET | EPOLLONESHOT),
       manager(new User_manager()) {
 
-    filesystem::path currPath =  filesystem::current_path() / "log";
+    filesystem::path currPath =  filesystem::current_path() / "logs";
     this->logger = make_unique<Logger>(Logger::BOTH, Logger::INFO, currPath);
     
     SockInit();
